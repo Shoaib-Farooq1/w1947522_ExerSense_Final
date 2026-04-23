@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>ExerSense</title>
+    <style>
+        body {
+            background: black;
+            color: white;
+            font-family: monospace;
+            padding: 40px;
+        }
+
+        h1 {
+            color: dodgerblue;
+            letter-spacing: 4px;
+            margin-bottom: 40px;
+        }
+
+        button {
+            background: transparent;
+            border: 1px solid dodgerblue;
+            color: dodgerblue;
+            padding: 10px 20px;
+            margin-right: 10px;
+        }
+
+        button:hover {
+            background: dodgerblue;
+            color: black;
+        }
+
+        .metric {
+            display: inline-block;
+            background: #111;
+            padding: 20px 30px;
+            margin: 20px 4px 0 0;
+        }
+
+        .metric-label {
+            font-size: 0.65rem;
+            color: gray;
+            letter-spacing: 3px;
+            text-transform: uppercase;
+        }
+
+        .metric-value {
+            font-size: 2rem;
+            color: dodgerblue;
+        }
+
+        table { width: 100%; margin-top: 40px; }
+        th { color: gray; text-align: left; padding: 10px; }
+        td { padding: 10px; border-bottom: 1px solid #222; }
+
+        .score-good { color: limegreen; }
+        .score-ok   { color: orange; }
+        .score-bad  { color: red; }
+    </style>
+</head>
+<body>
+
+    <h1>EXERSENSE</h1>
+
+    <button onclick="newSession()">Start Session</button>
+    <button onclick="startSet()">Start Set</button>
+    <button onclick="stopSet()">Stop Set</button>
+
+    <div>
+        <div class="metric">
+            <div class="metric-label">Status</div>
+            <div class="metric-value" id="status">waiting</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">ROM</div>
+            <div class="metric-value" id="rom">—</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Rep</div>
+            <div class="metric-value" id="rep">—</div>
+        </div>
+        <div class="metric">
+            <div class="metric-label">Score</div>
+            <div class="metric-value" id="score">—</div>
+        </div>
+    </div>
+
+    <div id="summary" style="display:none">
+        <table id="results-table">
+            <tr>
+                <th>Rep</th>
+                <th>Score</th>
+                <th>ROM %</th>
+            </tr>
+        </table>
+    </div>
+
+    <script>
+        fetch('/reset')
+
+        let reportShown = false;
+
+
+        function newSession() {
+            fetch('/start')
+        }
+
+        function startSet() {
+            fetch('/set')
+        }
+
+        function stopSet() {
+            fetch('/stop')
+        }
+
+        function updatePage(data) {
+            document.getElementById('status').innerText = data.status;
+
+            if (data.score !== 0) {
+                const scoreEl = document.getElementById('score');
+                scoreEl.innerText = data.score;
+                if (data.score >= 70) {
+                    scoreEl.style.color = 'limegreen';
+                } else if (data.score >= 50) {
+                    scoreEl.style.color = 'orange';
+                } else {
+                    scoreEl.style.color = 'red';
+                }
+            } else {
+                document.getElementById('score').innerText = '—';
+                document.getElementById('score').style.color = 'dodgerblue';
+            }
+
+            if (data.rom !== 0) {
+                document.getElementById('rom').innerText = data.rom + '%';
+            } else {
+                document.getElementById('rom').innerText = '—';
+            }
+
+            if (data.rep) {
+                document.getElementById('rep').innerText = data.rep;
+            } else {
+                document.getElementById('rep').innerText = '—';
+            }
+
+            if (data.status === 'complete' && data.results) {
+                showReport(data.results);
+            }
+
+
+        }
+
+
+
+        function showReport(results) {
+            if (reportShown) return;
+            reportShown = true;
+
+            document.getElementById('summary').style.display = 'block';
+            const table = document.getElementById('results-table');
+            results.forEach(r => {
+                const row = table.insertRow();
+                row.insertCell(0).innerText = r.rep;
+
+                const scoreCell = row.insertCell(1);
+                scoreCell.innerText = r.score.toFixed(0);
+                scoreCell.className = r.score >= 70 ? 'score-good' : r.score >= 50 ? 'score-ok' : 'score-bad';
+
+                const romCell = row.insertCell(2);
+                romCell.innerText = r.rom_percent.toFixed(0) + '%';
+                if (r.rom_percent < 80) {
+                romCell.innerText += '(low ROM)';
+                romCell.style.color = 'orange';
+                }
+            });
+        }
+
+        setInterval(function() {
+            fetch('/status')
+                .then(r => r.json())
+                .then(data => updatePage(data));
+        }, 1000);
+    </script>
+
+</body>
+</html>
